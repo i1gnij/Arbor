@@ -1,0 +1,436 @@
+#include <AnaSinglePart.hh>
+#include "ArborTool.hh"
+#include "ArborToolLCIO.hh"
+#include "DetectorPos.hh"
+#include <EVENT/LCCollection.h>
+#include <EVENT/MCParticle.h>
+#include <EVENT/Track.h>
+#include <EVENT/TrackerHit.h>
+#include <EVENT/ReconstructedParticle.h>
+#include <EVENT/CalorimeterHit.h>
+#include <EVENT/SimCalorimeterHit.h>
+#include <values.h>
+#include <string>
+#include <iostream>
+#include <cmath>
+#include <vector>
+#include <stdlib.h>
+#include <EVENT/LCFloatVec.h>
+#include <EVENT/LCParameters.h>
+#include <EVENT/Cluster.h>
+#include <EVENT/LCRelation.h>
+#include <UTIL/CellIDDecoder.h>
+#include <UTIL/LCRelationNavigator.h>
+#include <stdexcept>
+#include <TFile.h> 
+#include <TTree.h>
+#include <TMath.h>
+#include <Rtypes.h> 
+#include <sstream>		
+#include <TH1.h>
+#include <TVector3.h>
+#include <TLorentzVector.h>
+#include "HelixClassAb.hh"
+
+
+
+using namespace std;
+
+AnaSinglePart aAnaSinglePart ;
+AnaSinglePart::AnaSinglePart()
+	: Processor("AnaSinglePart"),
+	_output(0)
+{
+	_description = "Cluster Ana" ;
+
+	_treeFileName="AnaSinglePart.root";
+	registerProcessorParameter( "TreeOutputFile" , 
+			"The name of the file to which the ROOT tree will be written" ,
+			_treeFileName ,
+			_treeFileName);
+
+	_overwrite=0;
+	registerProcessorParameter( "OverwriteFile" , 
+			"If zero an already existing file will not be overwritten." ,
+			_overwrite ,
+			_overwrite);
+
+	_filenum=0;
+	registerProcessorParameter( "FileNum" , 
+			"File Numero" ,
+			_filenum ,
+			_filenum);
+
+}
+
+void AnaSinglePart::init() {
+
+	printParameters();
+
+	TFile *tree_file=new TFile(_treeFileName.c_str(),(_overwrite ? "RECREATE" : "UPDATE"));
+
+	if (!tree_file->IsOpen()) {
+		delete tree_file;
+		tree_file=new TFile(_treeFileName.c_str(),"NEW");
+	}
+
+	_outputEvt = new TTree("Evt", "Evt");
+	_outputEvt->SetAutoSave(32*1024*1024); 
+	_outputEvt->Branch("EventNr", &_eventNr,"EventNr/I");
+	_outputEvt->Branch("Num", &_Num,"Num/I");  
+	_outputEvt->Branch("File", &_filenum,"File/I");
+	_outputEvt->Branch("NMCP", &_nMCP,"NMCP/I");
+	_outputEvt->Branch("NSelMCP", &_nSelMCP12B2, "NSelMCP/I");
+	_outputEvt->Branch("MCPTheta", &_MCPOTheta, "MCPTheta/F");
+	_outputEvt->Branch("MCPPhi", &_MCPOPhi, "MCPPhi/F");  
+	_outputEvt->Branch("MCPEn", &_MCPOEn, "MCPEn/F");    
+	_outputEvt->Branch("MCPID", &_MCPOID, "MCPID/I");
+	_outputEvt->Branch("THEn", &_THEn,"THEn/F");   
+	_outputEvt->Branch("NClu", &_nClu,"NClu/I");  
+	_outputEvt->Branch("TCEn", &_TCEn,"TCEn/F");    
+	_outputEvt->Branch("LCEn", &_LCEn,"LCEn/F");
+	_outputEvt->Branch("NPFOa", &_nPFO_a,"NPFOa/I");
+	_outputEvt->Branch("NCHPFOa", &_nCHPFOs_a,"NCHPFOa/I");
+	_outputEvt->Branch("NNEPFOa", &_nNEPFOs_a,"NNEPFOa/I");
+	_outputEvt->Branch("NCMIPPFOa", &_nCMIPPFOs_a,"NCMIPPFOa/I");
+	_outputEvt->Branch("NCEMPFOa", &_nCEMPFOs_a,"NCEMPFOa/I");
+	_outputEvt->Branch("NCHADPFOa", &_nCHADPFOs_a,"NCHADPFOa/I");
+	_outputEvt->Branch("NNEMPFOa", &_nNEMPFOs_a,"NNEMPFOa/I");
+	_outputEvt->Branch("NNHADPFOa", &_nNHADPFOs_a,"NNHADPFOa/I");
+        _outputEvt->Branch("LPFOEn_a", &_leadingPFOEn,"LPFOEn_a/F");
+	_outputEvt->Branch("LChPFOEn_a", &_leadingChPFOEn,"LChPFOEn_a/F");
+	_outputEvt->Branch("LNePFOEn_a", &_leadingNePFOEn,"LNePFOEn_a/F");
+	_outputEvt->Branch("LThetaCh_a", &_LChPFOTheta,"LThetaCh_a/F");
+	_outputEvt->Branch("LThetaNe_a", &_LNePFOTheta,"LThetaNe_a/F");
+	_outputEvt->Branch("LPhiCh_a", &_LChPFOPhi,"LPhiCh_a/F");
+	_outputEvt->Branch("LPhiNe_a", &_LNePFOPhi,"LPhiNe_a/F");
+	_outputEvt->Branch("TotRecoP4a", _TotalRecoP4_a,"TotRecoP4a[4]/F"); 
+
+
+ 
+
+	_outputPFO = new TTree("PFO", "PFO");
+	_outputPFO->SetAutoSave(32*1024*1024);
+	_outputPFO->Branch("EventNr", &_eventNr,"EventNr/I");
+	_outputPFO->Branch("Num", &_Num,"Num/I");  
+	_outputPFO->Branch("File", &_filenum,"File/I");
+	_outputPFO->Branch("MCPTheta", &_MCPOTheta, "MCPTheta/F");
+	_outputPFO->Branch("MCPPhi", &_MCPOPhi, "MCPPhi/F");  
+	_outputPFO->Branch("Theta", &_PFOTheta, "Theta/F");
+	_outputPFO->Branch("Phi", &_PFOPhi, "Phi/F");  
+	_outputPFO->Branch("MCPEn", &_MCPOEn, "MCPEn/F");     
+	_outputPFO->Branch("P4", _PPFO_a,"P4[4]/F");     
+	_outputPFO->Branch("Type", &_Type_a,"Type/I");
+	_outputPFO->Branch("Charge", &_Charge_a,"Charge/I");    
+	_outputPFO->Branch("CluEn", &_PFOCluEn_a,"CluEn/F");  
+	_outputPFO->Branch("TrkD0", &_trkZ0, "TrkD0/F");  
+	_outputPFO->Branch("TrkZ0", &_trkD0, "TrkZ0/F");  
+	_outputPFO->Branch("TrkSP", _trkSP, "TrkSP[3]/F");  
+	_outputPFO->Branch("TrkEP", _trkEP, "TrkEP[3]/F");  
+	_outputPFO->Branch("TrkNH", &_NHTrk, "TrkNH/I");
+
+	_Num = 0;	
+       
+}
+
+void AnaSinglePart::processEvent( LCEvent * evtP ) 
+{		
+
+	if (evtP) 								
+	{
+		_eventNr=evtP->getEventNumber();	
+                cout << "Event:" << _eventNr << endl;
+		
+		_nMCP = 0;
+		_nSelMCP12B2 = 0;
+
+		_MCPOTheta = 0;
+		_MCPOPhi = 0;
+		_MCPOEn = 0;
+		_MCPOID = 0;
+
+		
+		_THEn = 0;
+
+		_nClu = 0;
+		_TCEn = 0;
+		_LCEn = 0;
+			
+		_nPFO_a = 0;
+		_nCHPFOs_a = 0;
+		_nNEPFOs_a = 0;
+		_nCMIPPFOs_a = 0;
+		_nCEMPFOs_a = 0;
+		_nCHADPFOs_a = 0;
+		_nNEMPFOs_a = 0;
+		_nNHADPFOs_a = 0;
+		
+		_leadingPFOEn = 0;
+	        _leadingChPFOEn = 0;
+		_leadingNePFOEn = 0;
+		
+		_LNePFOTheta = 0;
+		_LNePFOPhi = 0;		
+		
+		_LChPFOTheta = 0;
+		_LChPFOPhi = 0;	
+
+		_TotalRecoP4_a[0] = 0;
+		_TotalRecoP4_a[1] = 0;
+		_TotalRecoP4_a[2] = 0;
+		_TotalRecoP4_a[3] = 0;
+
+		
+			try 	
+			{  
+                   
+	            		LCCollection * MCP = evtP->getCollection("MCParticle");
+		    		int NMC= MCP->getNumberOfElements();
+				TVector3 VtxPos, EndPPos;
+			
+                    		for(int i0 = 0; i0 < NMC; i0++)
+		    		{
+					_nMCP++;
+					MCParticle * a_MCP = dynamic_cast<MCParticle*>(MCP->getElementAt(i0));
+
+					VtxPos = a_MCP->getVertex();
+					EndPPos = a_MCP->getEndpoint();
+					int _PIDMCP=a_MCP->getPDG();
+
+					TVector3 MCPP(a_MCP->getMomentum()[0],a_MCP->getMomentum()[1],a_MCP->getMomentum()[2]);
+					
+					if(((VtxPos.Perp() < 1750 && VtxPos.Perp() > 200 && fabs(VtxPos.Z()) < 2250) || (VtxPos.Perp() < 200 && fabs(VtxPos.Z()) < 1130)) && (EndPPos.Perp() > 1750 || fabs(EndPPos.Z()) > 2250 || (EndPPos.Perp() < 200 && fabs(EndPPos.Z()) > 1130)) && fabs(_PIDMCP) != 12 &&  fabs(_PIDMCP) != 14 &&  fabs(_PIDMCP) != 16 && (VtxPos-EndPPos).Mag() > 500 )
+					{
+						_nSelMCP12B2++;
+					}
+					
+					if(i0 == 0)
+					{
+						_MCPOTheta = MCPP.Theta();
+						_MCPOPhi = MCPP.Phi();
+						_MCPOEn = a_MCP->getEnergy();
+						_MCPOID = _PIDMCP;
+					}
+				
+		    		}
+
+                	}catch (lcio::DataNotAvailableException err) { };
+
+			std::vector<std::string> CaloHitCollections;
+			CaloHitCollections.clear();
+			CaloHitCollections.push_back("ECALPSHitCollection");
+			CaloHitCollections.push_back("ECALBarrel");
+			CaloHitCollections.push_back("ECALEndcap");
+			CaloHitCollections.push_back("ECALOther");
+			CaloHitCollections.push_back("HCALBarrel");
+			CaloHitCollections.push_back("HCALEndcap");
+			CaloHitCollections.push_back("HCALOther");
+			CaloHitCollections.push_back("LCAL");
+			CaloHitCollections.push_back("LHCAL");
+
+			int nCol = CaloHitCollections.size();
+
+			for(int c1 = 0;c1 < nCol; c1++)
+			{
+				try
+                		{
+					LCCollection * CaloHitColl = evtP ->getCollection(CaloHitCollections[c1].c_str());
+					int NHitsCurrCol = CaloHitColl->getNumberOfElements();
+					
+
+					for(int h0 = 0; h0 < NHitsCurrCol; h0++)
+                                	{
+						CalorimeterHit * a_hit = dynamic_cast<CalorimeterHit*>(CaloHitColl->getElementAt(h0));
+
+						_THEn += a_hit->getEnergy();
+					}				
+
+                		}catch (lcio::DataNotAvailableException err) { };
+			}
+
+			try 	
+			{  
+             
+	           		LCCollection *CluColl = evtP ->getCollection("SMBush_3rdIt");
+				int NCluCurrCol = CluColl->getNumberOfElements();
+				_nClu = NCluCurrCol;
+				float LCEn = 0;
+				float TCEn = 0; 					
+
+				for(int ci = 0; ci < NCluCurrCol; ci++)
+                                {
+					Cluster * aa_clu = dynamic_cast<Cluster*>(CluColl->getElementAt(ci));
+					float aa_CluE = aa_clu->getEnergy();
+					if (aa_CluE > LCEn)
+					{
+						LCEn = aa_CluE;
+					}
+					TCEn += aa_CluE;
+				}
+				_LCEn = LCEn;
+				_TCEn = TCEn;
+				
+				
+                	}catch (lcio::DataNotAvailableException err) { };
+
+
+			try 	
+			{  
+                   
+	            		LCCollection *PFO = evtP->getCollection( "ArborPFOs" );
+				int NPFO = PFO->getNumberOfElements();
+			
+				_Charge_a = 0;
+				_Type_a = 0;
+				_PPFO_a[3] = 0;
+				_PPFO_a[0] = 0;
+				_PPFO_a[1] = 0;
+				_PPFO_a[2] = 0;
+
+				float maxEn = -1.0;
+				float maxEnCh = -1.0;
+				float maxEnNe = -1.0;	
+			
+				for(int p0 =0;p0 < NPFO; p0++)
+				{
+					_nPFO_a++;
+					ReconstructedParticle *a_PFO=dynamic_cast<EVENT::ReconstructedParticle *>(PFO->getElementAt(p0)); 
+					_Charge_a = a_PFO->getCharge();
+					_Type_a = a_PFO->getType();
+					_PFOCluEn_a = 0;
+					
+					TLorentzVector currP( a_PFO->getMomentum()[0], a_PFO->getMomentum()[1], a_PFO->getMomentum()[2], a_PFO->getEnergy());
+					float PFOEn = a_PFO->getEnergy();
+					if(PFOEn > maxEn) maxEn = PFOEn;			
+
+					_trkD0 = -1;
+					_trkZ0 = -1;
+					_trkSP[0] = -1;
+					_trkSP[1] = -1;
+					_trkSP[2] = -1;
+					_trkEP[0] = -1;
+					_trkEP[1] = -1;
+					_trkEP[2] = -1;
+					_NHTrk = -1;
+					
+					
+                                	if(_Charge_a == 0)
+					{
+						if(_Type_a == 22)
+						{ 
+							_nNEMPFOs_a++;
+						}
+						else 
+						{
+							_nNHADPFOs_a++;
+						}
+					 	_nNEPFOs_a++;
+						_PFOCluEn_a = a_PFO->getEnergy();
+						if(PFOEn > maxEnNe)
+						{
+							maxEnNe = PFOEn;
+							_leadingNePFOEn = PFOEn;
+							int nClusters = a_PFO->getClusters().size();
+							if(nClusters > 0)
+							{
+								_LNePFOTheta = currP.Theta();
+								_LNePFOPhi = currP.Phi();
+							}
+
+						}
+					}
+                                	else
+					{
+                                        	if(fabs(_Type_a) == 11)
+						{ 
+							_nCEMPFOs_a++;
+						}
+                                        	else if(fabs(_Type_a) == 13) 
+						{
+							_nCMIPPFOs_a++;
+						}
+                                        	else 
+						{
+							_nCHADPFOs_a++;
+						}
+                                         	_nCHPFOs_a++;
+						int nPClu_a = a_PFO->getClusters().size();
+						if(nPClu_a > 0)
+						{
+							for(int pc = 0; pc < nPClu_a;pc++)
+							{
+								Cluster* a_pclu = a_PFO->getClusters()[pc];
+								_PFOCluEn_a += a_pclu->getEnergy();
+							}
+						}
+						if(a_PFO->getTracks().size() > 0)
+						{
+							Track* a_trk = a_PFO->getTracks()[0];
+							_trkD0 = a_trk->getD0();
+							_trkZ0 = a_trk->getZ0();
+							_NHTrk = a_trk->getTrackerHits().size();				
+							TVector3 TrkEP = (a_trk->getTrackerHits()[_NHTrk - 1])->getPosition();	
+							TVector3 TrkSP = (a_trk->getTrackerHits()[0])->getPosition();
+					
+							_trkSP[0] = TrkSP.X();
+							_trkSP[1] = TrkSP.Y();
+							_trkSP[2] = TrkSP.Z();
+
+							_trkEP[0] = TrkEP.X();
+							_trkEP[1] = TrkEP.Y();
+							_trkEP[2] = TrkEP.Z();
+							
+						}
+						
+						if(PFOEn > maxEnCh)
+                                                {
+                                                        maxEnCh = PFOEn;
+                                                        _leadingChPFOEn = PFOEn;
+                                                        int nClusters = a_PFO->getClusters().size();
+                                                        if(nClusters > 0)
+                                                        {
+								_LChPFOTheta = currP.Theta();
+								_LChPFOPhi = currP.Phi();
+                                                        }
+
+                                                }
+				
+                                	}
+                  
+					_PPFO_a[3] = a_PFO->getEnergy();
+					_PPFO_a[0] = a_PFO->getMomentum()[0];
+					_PPFO_a[1] = a_PFO->getMomentum()[1];
+					_PPFO_a[2] = a_PFO->getMomentum()[2];
+                     
+					_TotalRecoP4_a[0] += _PPFO_a[0];
+					_TotalRecoP4_a[1] += _PPFO_a[1];
+					_TotalRecoP4_a[2] += _PPFO_a[2];
+					_TotalRecoP4_a[3] += _PPFO_a[3];
+
+					_PFOTheta = currP.Theta();
+					_PFOPhi = currP.Phi();
+					_outputPFO->Fill();
+					
+				} 
+
+				_leadingPFOEn = maxEn;
+
+                	}catch (lcio::DataNotAvailableException err) { };
+
+                _outputEvt->Fill();
+                _Num++;
+
+         }
+}
+
+void AnaSinglePart::end()
+{
+
+	if (_outputEvt) {
+
+		TFile *tree_file = _outputEvt->GetCurrentFile(); //just in case we switched to a new file
+		tree_file->Write();
+		delete tree_file;
+	}
+
+}

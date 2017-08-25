@@ -1,0 +1,146 @@
+#ifndef _BushConnect_hh_
+#define _BushConnect_hh_
+
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <marlin/Processor.h>
+#include <EVENT/CalorimeterHit.h>
+#include <EVENT/Cluster.h>
+#include <EVENT/MCParticle.h>
+#include <EVENT/ReconstructedParticle.h>
+#include <EVENT/Track.h>
+#include <IMPL/LCFlagImpl.h>
+#include <TNtuple.h>
+#include <TObject.h>
+
+#include <TTree.h>
+#include <TFile.h>
+#include <TH3.h>
+#include <TVector3.h>
+
+class TTree;
+
+  class BushConnect  : public marlin::Processor
+  {
+  public:
+
+    Processor*  newProcessor() { return new BushConnect ; }
+ 
+    BushConnect();
+    
+    ~BushConnect() {};
+
+    void init();
+
+    void Clean();
+
+    void TrackSort(EVENT::LCEvent* evtPP);
+    void EHBush2ndMerge(EVENT::LCEvent* evtPP);
+
+    void BushSelfMerge(EVENT::LCEvent* evtPP);
+ 
+    void BushTrackMatch(EVENT::LCEvent* evtPP);
+
+    void BushMCPMatch(LCEvent * evtPP);
+
+    void ParticleReco(LCEvent * evtPP);
+
+    void processEvent( LCEvent * evtP );   
+
+    void end();
+
+
+  protected:
+
+    std::vector<std::string> _BushCollections; 
+    std::vector<std::string> _HitCollections;
+    LCFlagImpl Cluflag;
+    std::ostream *_output;
+
+    std::vector<Track*> SortedTracks;
+    std::map<Track*, float> Track_Energy;
+    std::map<Track*, int> Track_Type;	
+  
+    std::map<Cluster*, int> ClusterType_1stID;
+    std::map<ReconstructedParticle*, int> ChCoreID; 
+
+// Add by V3
+
+    std::vector<Cluster*> SortedSMBushes;	//SelfMerge Cluster output
+    std::map<Cluster*, int> SMBushes_Type; 
+
+// end Add V3
+
+    std::vector<Cluster*> ecalchcore_tight;         //TightCores
+    std::vector<Cluster*> ecalchcore_medium;
+    std::vector<Cluster*> ecalchcore_loose;         //LooseCores    Let's also get
+    std::vector<Cluster*> ecalchcore; 		    //Above three
+    std::vector<Cluster*> ecalnecore;
+    std::vector<Cluster*> ecalnecore_EM;
+    std::vector<Cluster*> ecalnecore_NonEM;
+    std::vector<Cluster*> ecalfrag;
+    std::vector<Cluster*> ecalundef;
+    std::vector<Cluster*> ecalfrag_TBM_CH;
+    std::vector<Cluster*> ecalfrag_TBM_NE_EM;
+    std::vector<Cluster*> ecalfrag_TBM_NE_NonEM;
+    std::vector<Cluster*> ecalundef_iso;
+    std::vector<Cluster*> ecalpotentialbackscattering;
+
+    std::vector<Cluster*> hcalchcore_tight;         //LooseCores    Let's also get
+    std::vector<Cluster*> hcalchcore_medium;
+    std::vector<Cluster*> hcalchcore_loose;
+    std::vector<Cluster*> hcalchcore;
+    std::vector<Cluster*> hcalnecore;
+    std::vector<Cluster*> hcalfrag;
+    std::vector<Cluster*> hcalundef;
+    std::vector<Cluster*> hcalfrag_TBM_CH;
+    std::vector<Cluster*> hcalfrag_TBM_NE_EM;
+    std::vector<Cluster*> hcalfrag_TBM_NE_NonEM;
+    std::vector<Cluster*> hcalundef_iso; 
+
+    std::vector<Cluster*> chargedclustercore;
+    std::vector<Cluster*> chargedclustercore_abs;
+    std::vector<Cluster*> non_chargedclustercore;
+
+    std::map<Track*, TVector3> trkendposition;
+    std::map<Cluster*, float> CluFD; 
+
+    /*
+       std::vector<Cluster*> PotentialEcalMuonCluster; 
+       std::vector<Cluster*> PotentialHcalMuonCluster;
+       std::vector<Cluster*> PotentialEcalEMCluster;
+       std::vector<Cluster*> PotentialHcalEMCluster;
+       std::vector<Cluster*> PotentialEcalHadCluster;
+       std::vector<Cluster*> PotentialHcalHadCluster;
+       std::vector<Cluster*> EcalFragments; 
+       std::vector<Cluster*> HcalFragments;
+       std::vector<Cluster*> PotentialIsoCluster; 
+
+       std::vector<Cluster*> CoreChargedCluster; 
+       std::vector<Cluster*> CoreNeutralCluster; 
+       std::vector<Cluster*> PotentialChargedCluster; 
+       std::vector<Cluster*> PotentialNeutralCluster; 
+
+*/
+
+	TTree *_outputTree;
+	TTree *_outputFrag; 
+	int _eventNr; 
+	int _Num;
+	float _TrkMom[3];
+	int _NTLC; 
+	int _NTrk; 
+	float _sumLCE, _UnLinkMIPE, _elseE; 
+	int _NClu; 
+	float _Pos[3];
+	float _En, _Depth, _FD; 
+	float _DisToTrk, _DisToFC; 
+	int _Size; 
+
+  };
+
+#endif
+
+
